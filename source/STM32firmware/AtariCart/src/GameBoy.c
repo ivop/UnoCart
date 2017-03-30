@@ -53,14 +53,14 @@ void emulate_vram(void) {
 			}
 		}
 		else if (!(c & S5)) {
-			if (c & RW) {
+//			if (c & RW) {
 				SET_DATA_MODE_OUT
 				//addr = ADDR_IN;
 				DATA_OUT = ((uint16_t)(ScreenRAM[addr])) << 8;
 				// wait for phi2 low
 				while (CONTROL_IN & PHI2) ;
 				SET_DATA_MODE_IN
-			} else {
+/*			} else {
 				//addr = ADDR_IN;
 				data = DATA_IN;
 				// read data bus on falling edge of phi2
@@ -68,7 +68,7 @@ void emulate_vram(void) {
 					data = DATA_IN;
 				ScreenRAM[addr] = data >> 8;
 			}
-		}
+*/		}
 		else if (!(c & S4)) {
 			if (c & RW) {
 				SET_DATA_MODE_OUT
