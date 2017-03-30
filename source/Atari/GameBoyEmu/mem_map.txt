@@ -1,0 +1,65 @@
+
+FF40 -- LCDCONT [RW] LCD Control              | when set to 1 | when set to 0
+Bit7  LCD operation                           | ON            | OFF
+Bit6  Window Tile Table address               | 9C00-9FFF     | 9800-9BFF
+Bit5  Window display                          | ON            | OFF
+Bit4  Tile Pattern Table address              | 8000-8FFF     | 8800-97FF
+Bit3  Background Tile Table address           | 9C00-9FFF     | 9800-9BFF
+Bit2  Sprite size                             | 8x16          | 8x8
+Bit1  Color #0 transparency in the window     | SOLID         | TRANSPARENT
+Bit0  Background display                      | ON            | OFF
+----------------------------------------------+---------------+---------------
+FF41 -- LCDSTAT [RW] LCD Status               | when set to 1 | when set to 0
+Bit6    Interrupt on scanline coincidence     | ON            | OFF
+Bit5    Interrupt on controller mode 10       | ON            | OFF
+Bit4    Interrupt on controller mode 01       | ON            | OFF
+Bit3    Interrupt on controller mode 00       | ON            | OFF
+Bit2    Scanline coincidence flag             | COINCIDENCE   | NO COINCIDENCE 
+Bit1-0  LCD Controller mode:
+  00 - Horizontal blanking impulse [VRAM 8000-9FFF can be accessed by CPU]
+  01 - Vertical blanking impulse [VRAM 8000-9FFF can be accessed by CPU]
+  10 - OAM FE00-FE90 is accessed by LCD controller
+  11 - Both OAM FE00-FE90 and VRAM 8000-9FFF are accessed by LCD controller
+------------------------------------------------------------------------------
+FF42 -- SCROLLY [RW] Background Vertical Scrolling
+------------------------------------------------------------------------------
+FF43 -- SCROLLX [RW] Background Horizontal Scrolling
+------------------------------------------------------------------------------
+FF44 -- CURLINE [RW] Current Scanline
+        This register contains the number of a screen line currently being
+        scanned. It can take values 0-153 where 144-153 indicate the vertical
+        blanking period. Writing into this register resets it.
+------------------------------------------------------------------------------
+FF45 -- CMPLINE [RW] Scanline Comparison
+        When contents of CURLINE are equal to contents of CMPLINE, scanline
+        coincidence flag is set in the LCD status register and an interrupt
+        may occur.
+------------------------------------------------------------------------------
+FF47 -- BGRDPAL [W] Background Palette
+Bit7-6  Palette for color #3  |
+Bit5-4  Palette for color #2  |     00 ------- 01 ------- 10 -------> 11
+Bit3-2  Palette for color #1  |     lightest                     darkest
+Bit1-0  Palette for color #0  |
+------------------------------+-----------------------------------------------
+FF48 -- OBJ0PAL [W] Sprite Palette #0
+Bit7-6  Palette for color #3  |
+Bit5-4  Palette for color #2  |     00 ------- 01 ------- 10 -------> 11
+Bit3-2  Palette for color #1  |     lightest                     darkest
+Bit1-0  Palette for color #0  |
+------------------------------+-----------------------------------------------
+FF49 -- OBJ1PAL [W] Sprite Palette #1
+Bit7-6  Palette for color #3  |
+Bit5-4  Palette for color #2  |     00 ------- 01 ------- 10 -------> 11
+Bit3-2  Palette for color #1  |     lightest                     darkest
+Bit1-0  Palette for color #0  |
+------------------------------+-----------------------------------------------
+FF4A -- WNDPOSY [RW] Window Y Position
+        WNDPOSY may assume values 0-143. It determines the vertical position
+        of the left upper corner of a window on the screen.
+------------------------------------------------------------------------------
+FF4B -- WNDPOSX [RW] Window X Position
+        WNDPOSX may assume values 7-166. It determines the horizontal position
+        of the left upper corner of a window on the screen. The real position
+        is WNDPOSX-7.
+------------------------------------------------------------------------------
+FF46 -- DMACONT [W] DMA Transfer Control
