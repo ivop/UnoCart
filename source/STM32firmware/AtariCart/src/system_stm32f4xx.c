@@ -153,13 +153,17 @@
 /************************* PLL Parameters *************************************/
 /* PLL_VCO = (HSE_VALUE or HSI_VALUE / PLL_M) * PLL_N */
 #define PLL_M      16
-#define PLL_N      336
+//#define PLL_N      336
+//#define PLL_N      384
+#define PLL_N      400
 
 /* SYSCLK = PLL_VCO / PLL_P */
 #define PLL_P      2
 
 /* USB OTG FS, SDIO and RNG Clock =  PLL_VCO / PLLQ */
-#define PLL_Q      7
+//#define PLL_Q      7
+//#define PLL_Q     8
+#define PLL_Q     10
 
 /******************************************************************************/
 
@@ -179,7 +183,9 @@
   * @{
   */
 
-  uint32_t SystemCoreClock = 168000000;
+//  uint32_t SystemCoreClock = 168000000;
+//  uint32_t SystemCoreClock = 192000000;
+  uint32_t SystemCoreClock = 200000000;
 
   __I uint8_t AHBPrescTable[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9};
 

@@ -1,0 +1,518 @@
+mads 2.0.6 build 58 (28 Jan 17)
+Source: GameBoyPY.asm
+     1 				/* Gameboy Demo ROM for use with UnoCart
+     2 				 * by Mark Keates/Wrathchild@AtariAge
+     3 				 * This file builds with WUDSN/MADS into an 8K Atari ROM
+     4 				 * The 8k ROM is loaded with the GameBoy/VRAM from Pokemon:
+     5 				 */
+     5
+     6
+     7 = 0030			CART_CMD_REFRESH_SCREEN = $30
+     8 = 0031			CART_CMD_INIT_VRAM = $31
+     9 = 0031			CART_CMD_PREPARE_LINE = $31
+    10
+    11 = 9C00			GAMEBOY_FONT = $9C00
+    12 = 9E00			GAMEBOY_OAM = $9E00
+    13 = 9F40			GAMEBOY_REGS = $9F40
+    14
+    15 = 9F40			LCDCONT = $9F40
+    16 = 9F41			LCDSTAT = $9F41
+    17 = 9F42			SCROLLY = $9F42
+    18 = 9F43			SCROLLX = $9F43
+    19 = 9F44			CURLINE = $9F44
+    20 = 9F45			CMPLINE = $9F45
+    21 = 9F46			DMACONT = $9F46
+    22 = 9F47			BGRDPAL = $9F47
+    23 = 9F48			OBJ0PAL = $9F48
+    24 = 9F49			OBJ1PAL = $9F49
+    25 = 9F4A			WNDPOSY = $9F4A
+    26 = 9F4B			WNDPOSX = $9F4B
+    27
+    28 				;@com.wudsn.ide.asm.outputfileextension=.rom
+    29
+    30 = 0080			CARTFG_DIAGNOSTIC_CART = $80       ;Flag value: Directly jump via CARTAD during RESET.
+    31 = 0004			CARTFG_START_CART      = $04       ;Flag value: Jump via CARTAD and then via CARTCS.
+    32 = 0001			CARTFG_BOOT            = $01       ;Flag value: Boot peripherals, then start the module.
+    33
+    34 = E45C			SETVBV = $E45C
+    35 = E462			XITVBV = $E462
+    36 = E477			COLDSV = $E477				; Coldstart (powerup) entry point
+    37 = E474			WARMSV = $E474				; Warmstart entry point
+    38
+    39 = D01A			COLBAK = $D01A
+    40 = D01F			CONSOL = $D01F
+    41 = D301			PORTB = $D301
+    42 = D400			DMACTL = $D400
+    43 = D404			HSCROL = $D404
+    44 = D407			PMBASE = $D407
+    45 = D40E			NMIEN = $D40E
+    46
+    47 = 022F			SDMCTL = $22F
+    48 = 026F			GPRIOR = $26F
+    49 = 02C0			PCOLR0 = $2C0
+    50 = 02C1			PCOLR1 = $2C1
+    51 = 02C2			PCOLR2 = $2C2
+    52 = 02C3			PCOLR3 = $2C3
+    53 = 02C4			COLOR0 = $2C4
+    54 = 02C5			COLOR1 = $2C5
+    55 = 02C6			COLOR2 = $2C6
+    56 = 02C7			COLOR3 = $2C7
+    57 = 02C8			COLOR4 = $2C8
+    58 = 02F4			CHBAS = $2F4
+    59
+    60 				; ************************ VARIABLES ****************************
+    61
+    62 = 000C			DOSINI		equ $0C
+    63 = 02E7			MEMLO		equ $02E7
+    64 = 02E0			RunVec		equ $02E0
+    65 = 02E2			IniVec		equ $02E2
+    66 = D40B			VCOUNT		equ $D40B
+    67 = D40A			WSYNC		equ $D40A
+    68 = 03FA			GINTLK		equ $03FA
+    69 = D013			TRIG3		equ $D013
+    70 = 0230			SDLSTL		equ $230
+    71 = E456			CIOV		equ $E456
+    72
+    73 = 00D0			scroll_dir = $D0
+    74 = 00D1			scroll_delay = $D1
+    75 = 00D2			scroll_x = $D2
+    76 = 00D3			scroll_y = $D3
+    77
+    78 				; ************************ CODE ****************************
+    79
+    80
+    81 					opt h-                     ;Disable Atari COM/XEX file headers
+    82
+    83 					org $a000                  ;RD5 cartridge base
+    84 					opt f+                     ;Activate fill mode
+    85 				load_vram
+    86 A000 A0 00 BA BD CE AE + 	ins "pokemon_vram.xex", 6
+    87 					
+    88 AF95				org $aff7
+    89 				;Cartridge initalization
+    90 				;Only the minimum of the OS initialization is complete, you don't want to code here normally.
+    91 AFF7			init    .proc
+    92 AFF7 A9 34			lda #$34
+    93 AFF9 8D C8 02			sta COLOR4
+    94 AFFC 8D 1A D0			sta COLBAK
+    95 AFFF 60				rts
+    96 					.endp ; proc init
+    97 					
+    98 B000				org $b000
+    99 				;Cartridge start
+   100 				;Copy main code to RAM and transfer control there
+   101 B000			start   .proc
+   102 B000 A9 84			lda #$84
+   103 B002 8D C8 02			sta COLOR4
+   104 B005 8D 1A D0			sta COLBAK
+   105 B008 20 14 B0			jsr copy_wait_for_cart
+   106 B00B 20 2B B0			jsr copy_page_6_data
+   107 B00E 20 39 B0			jsr copy_display_list
+   108 B011 4C 00 A0			jmp load_vram
+   109 					.endp
+   110 					
+   111 B014			.proc	copy_wait_for_cart
+   112 B014 A0 00			ldy #0
+   113 B016			@
+   114 B016 B9 00 BA			lda wait_for_cart,y
+   115 B019 99 00 07			sta .ADR wait_for_cart,y
+   116 B01C C8				iny
+   117 B01D D0 F7			bne @-
+   118 B01F B9 00 BB		@	lda wait_for_cart+$100,y
+   119 B022 99 00 08			sta .ADR wait_for_cart+$100,y
+   120 B025 C8				iny
+   121 B026 C0 D2			cpy #(.len[wait_for_cart] & 0xFF)
+   122 B028 D0 F5			bne @-
+   123 B02A 60				rts
+   124 					.endp
+   125
+   126 B02B			.proc	copy_page_6_data
+   127 B02B A0 00			ldy #0
+   128 B02D			@
+   129 B02D B9 00 BC			lda page_6_data_start,y
+   130 B030 99 00 06			sta .ADR page_6_data_start,y
+   131 B033 C8				iny
+   132 B034 C0 7C			cpy #page_6_data_end-page_6_data_start
+   133 B036 D0 F5			bne @-
+   134 B038 60				rts
+   135 					.endp
+   136
+   137 B039			.proc	copy_display_list
+   138 B039 A0 00			ldy #0
+   139 B03B			@
+   140 B03B B9 00 BE			lda display_list,y
+   141 B03E 99 80 7D			sta .ADR display_list,y
+   142 B041 B9 00 BF			lda display_list+$100,y
+   143 B044 99 80 7E			sta .ADR display_list+$100,y
+   144 B047 C8				iny
+   145 B048 D0 F1			bne @-
+   146 B04A			@
+   147 B04A B9 00 C0			lda display_list+$200,y
+   148 B04D 99 80 7F			sta .ADR display_list+$200,y
+   149 B050 C8				iny
+   150 B051 C0 E6			cpy #(.len[display_list] & 0xFF)
+   151 B053 D0 F5			bne @-
+   152 B055 A0 00			ldy #0
+   153 B057			@
+   154 B057 B9 00 BD			lda G15_dlist,y
+   155 B05A 99 00 7C			sta .ADR G15_dlist,y
+   156 B05D C8				iny
+   157 B05E C0 00			cpy #.len[G15_dlist]
+   158 B060 D0 F5			bne @-
+   159 B062 60				rts
+   160 					.endp
+   161
+   162 				.macro wait_cart_ready
+   163 					lda #'X'
+   164 				@
+   165 					cmp $D5DE
+   166 					; wait for cart to become ready
+   167 					bne @-
+   168 					.endm
+   169
+   170 B063 FF FF FF FF FF FF + 	.align $ba00,$FF
+   171 BA00				org $ba00, $700
+   172
+   173 = 9030			FLOWER_ANIM_ADDR = $9030
+   174 = 9140			WATER_ANIM_ADDR = $9140
+   175
+   176 				; cmd is in Accumulator
+   177 BA00			.proc wait_for_cart
+   178 BA00				wait_cart_ready
+Macro: WAIT_CART_READY [Source: GameBoyPY.asm]
+     1 BA00 A9 58			lda #'X'
+     2 BA02			@
+     3 BA02 CD DE D5			cmp $D5DE
+     5 BA05 D0 FB			bne @-
+Source: GameBoyPY.asm
+   179 					
+   180 BA07 A9 1A 8D C4 02		mva #$1A COLOR0
+   181 BA0C A9 16 8D C5 02		mva #$16 COLOR1
+   182 BA11 A9 12 8D C6 02		mva #$12 COLOR2
+   183 BA16 8D C8 02			sta COLOR4
+   184 BA19 A9 00 8D C7 02		mva #$00 COLOR3 ; unused
+   185
+   186 BA1E 20 33 08			jsr .ADR wait_for_vbi
+   187 BA21 AD 2F 02			lda SDMCTL
+   188 BA24 48				pha
+   189 BA25 A9 00			lda #0
+   190 BA27 8D 0E D4			sta NMIEN
+   191 BA2A 8D 2F 02			sta SDMCTL
+   192 BA2D 8D 00 D4			sta DMACTL
+   193
+   194 					; init vram (copy Pokemon data)
+   195 BA30 A9 31 8D DF D5		mva #CART_CMD_INIT_VRAM $D5DF
+   196 BA35				wait_cart_ready
+Macro: WAIT_CART_READY [Source: GameBoyPY.asm]
+     1 BA35 A9 58			lda #'X'
+     2 BA37			@
+     3 BA37 CD DE D5			cmp $D5DE
+     5 BA3A D0 FB			bne @-
+Source: GameBoyPY.asm
+   197 					
+   198 					; draw the initial screen
+   199 BA3C A9 30 8D DF D5		mva #CART_CMD_REFRESH_SCREEN $D5DF
+   200 BA41				wait_cart_ready
+Macro: WAIT_CART_READY [Source: GameBoyPY.asm]
+     1 BA41 A9 58			lda #'X'
+     2 BA43			@
+     3 BA43 CD DE D5			cmp $D5DE
+     5 BA46 D0 FB			bne @-
+Source: GameBoyPY.asm
+   201 					
+   202 BA48 A9 1E			lda #$1E
+   203 BA4A 20 3D 08			jsr .ADR set_bg_colour
+   204 					
+   205 BA4D AD FD BF			lda $BFFD
+   206 BA50 C9 04			cmp #CARTFG_START_CART
+   207 BA52 D0 05			bne CartOK
+   208 					; show green if boot rom still present
+   209 BA54 A9 CA			lda #$CA
+   210 BA56 20 3D 08			jsr .ADR set_bg_colour
+   211
+   212 BA59			CartOK
+   213 					; copy OAM / sprite data
+   214 BA59 A2 0C			ldx #(example_regs - example_oam)/4
+   215 BA5B 8E 41 D5			stx $D541 ; # of sprites
+   216 BA5E A0 00			ldy #0
+   217 BA60 8C 42 D5			sty $D542 ; # all lines scroll
+   218 BA63 B9 40 06		@	lda .ADR example_oam,y
+   219 BA66 99 00 9E			sta GAMEBOY_OAM,y
+   220 BA69 C8				iny
+   221 BA6A B9 40 06			lda .ADR example_oam,y
+   222 BA6D 99 00 9E			sta GAMEBOY_OAM,y
+   223 BA70 C8				iny
+   224 BA71 B9 40 06			lda .ADR example_oam,y
+   225 BA74 99 00 9E			sta GAMEBOY_OAM,y
+   226 BA77 C8				iny
+   227 BA78 B9 40 06			lda .ADR example_oam,y
+   228 BA7B 99 00 9E			sta GAMEBOY_OAM,y
+   229 BA7E C8				iny
+   230 BA7F CA				dex
+   231 BA80 D0 E1			bne @-
+   232 					; copy example register set
+   233 BA82 A0 00			ldy #0
+   234 BA84 B9 70 06		@	lda .ADR example_regs,y
+   235 BA87 99 40 9F			sta GAMEBOY_REGS,y
+   236 BA8A C8				iny
+   237 BA8B C0 0C			cpy #12
+   238 BA8D D0 F5			bne @-
+   239
+   240 BA8F 20 44 08			jsr .ADR init_scroll
+   241 					
+   242 					; each VBI will ask for a redraw
+   243 BA92 A9 07			LDA #7
+   244 BA94 A2 08			LDX #>(.ADR VBI)
+   245 BA96 A0 AF			LDY #<(.ADR VBI)
+   246 BA98 20 5C E4			JSR SETVBV
+   247
+   248 					; clear up old dlist
+   249 BA9B A0 7F			ldy #$7F
+   250 BA9D A9 00			lda #0
+   251 BA9F 99 00 9C		@	sta GAMEBOY_FONT,y
+   252 BAA2 88				dey
+   253 BAA3 10 FA			bpl @-
+   254 BAA5 A0 07			ldy #7
+   255 BAA7 A9 FF		@	lda #$FF
+   256 BAA9 99 00 9D			sta GAMEBOY_FONT+32*8,y
+   257 BAAC A9 AA			lda #$AA
+   258 BAAE 99 10 9D			sta GAMEBOY_FONT+34*8,y
+   259 BAB1 A9 55			lda #$55
+   260 BAB3 99 20 9D			sta GAMEBOY_FONT+36*8,y
+   261 BAB6 88				dey
+   262 BAB7 10 EE			bpl @-
+   263 					
+   264 					; Restore DMA (screen turns on at next VBlank)
+   265 BAB9 68				pla
+   266 BABA 8D 2F 02			sta SDMCTL
+   267 					
+   268 BABD			endless
+   269 					; enable dli's
+   270 BABD A9 C0 8D 0E D4		mva #$C0 NMIEN
+   271 BAC2 A0 00			ldy #0
+   272 BAC4			anim_loop
+   273 					; dlist toggler
+   274 BAC4 A9 05			lda #5
+   275 BAC6 CD 1F D0			cmp CONSOL
+   276 BAC9 F0 08			beq @+
+   277 BACB A2 7D			ldx #>(.ADR display_list)
+   278 BACD A9 80			lda #<(.ADR display_list)
+   279 BACF F0 06			beq @+1
+   280 BAD1 D0 04			bne @+1
+   281 BAD3 A2 7C		@	ldx #>(.ADR G15_dlist)
+   282 BAD5 A9 00			lda #<(.ADR G15_dlist)
+   283 BAD7 8E 31 02		@	stx $231
+   284 BADA 8D 30 02			sta $230
+   285 					; delay
+   286 BADD A9 14			lda #20
+   287 BADF 20 35 08			jsr .ADR wait_n_vbi
+   288 					; flower
+   289 BAE2 98				tya
+   290 BAE3 48				pha
+   291 BAE4 29 03			and #3
+   292 BAE6 0A 0A 0A 0A		:4	asl
+   293 BAEA AA				tax
+   294 BAEB A0 00			ldy #0
+   295 BAED			flower_loop
+   296 BAED BD 00 06			lda .ADR flower_images,x
+   297 BAF0 99 30 90			sta FLOWER_ANIM_ADDR,y
+   298 BAF3 E8				inx
+   299 BAF4 C8				iny
+   300 BAF5 C0 10			cpy #16
+   301 BAF7 D0 F4			bne flower_loop
+   302 					; water
+   303 BAF9 A2 00			ldx #0
+   304 BAFB 68				pla
+   305 BAFC A8				tay
+   306 BAFD 29 04			and #4
+   307 BAFF D0 16			bne	r_left
+   308 BB01			r_right
+   309 BB01 BD 40 91			lda WATER_ANIM_ADDR,x
+   310 BB04 4A				lsr
+   311 BB05 7E 40 91			ror WATER_ANIM_ADDR,x
+   312 BB08 BD 41 91			lda WATER_ANIM_ADDR+1,x
+   313 BB0B 4A				lsr
+   314 BB0C 7E 41 91			ror WATER_ANIM_ADDR+1,x
+   315 BB0F E8				inx
+   316 BB10 E8				inx
+   317 BB11 E0 10			cpx #16
+   318 BB13 D0 EC			bne r_right
+   319 BB15 F0 14			beq r_done
+   320 BB17			r_left
+   321 BB17 BD 40 91			lda WATER_ANIM_ADDR,x
+   322 BB1A 0A				asl
+   323 BB1B 3E 40 91			rol WATER_ANIM_ADDR,x
+   324 BB1E BD 41 91			lda WATER_ANIM_ADDR+1,x
+   325 BB21 0A				asl
+   326 BB22 3E 41 91			rol WATER_ANIM_ADDR+1,x
+   327 BB25 E8				inx
+   328 BB26 E8				inx
+   329 BB27 E0 10			cpx #16
+   330 BB29 D0 EC			bne r_left
+   331 BB2B			r_done
+   332 BB2B C8				iny
+   333 BB2C C0 08			cpy #8
+   334 BB2E D0 94			bne anim_loop
+   335 BB30 4C BD 07			jmp .ADR endless
+   336
+   337 BB33			wait_for_vbi
+   338 BB33 A9 01			lda #1
+   339 BB35			wait_n_vbi
+   340 BB35 18				clc
+   341 BB36 65 14			adc $14
+   342 BB38			@
+   343 BB38 C5 14			cmp $14
+   344 BB3A D0 FC			bne @-
+   345 BB3C 60				rts
+   346
+   347 BB3D			set_bg_colour
+   348 BB3D 8D C8 02			sta COLOR4
+   349 BB40 8D 1A D0			sta COLBAK
+   350 BB43 60				rts
+   351
+   352 BB44			init_scroll
+   353 BB44 A9 01 85 D1			mva #1 scroll_delay
+   354 BB48 A9 03 85 D0			mva #3 scroll_dir
+   355 BB4C A9 60 85 D2			mva #96 scroll_x
+   356 BB50 A9 60 85 D3			mva #96 scroll_y
+   357 BB54 60				rts
+   358
+   359 					; scroller
+   360 BB55			do_scroll
+   361 BB55 A9 06			lda #6
+   362 BB57 CD 1F D0			cmp CONSOL
+   363 BB5A F0 48			beq scroll_done
+   364 BB5C C6 D1			dec scroll_delay
+   365 BB5E D0 44			bne scroll_done
+   366 BB60 A9 05 85 D1			mva #5 scroll_delay
+   367 BB64 A5 D0			lda scroll_dir
+   368 BB66 C9 01			cmp #1
+   369 BB68 D0 0E			bne not_right
+   370 					; scroll right
+   371 BB6A E6 D2			inc scroll_x
+   372 BB6C A5 D2			lda scroll_x
+   373 BB6E C9 60			cmp #96
+   374 BB70 D0 04			bne @+
+   375 BB72 A9 02			lda #2
+   376 BB74 85 D0			sta scroll_dir
+   377 BB76 D0 2C		@	bne scroll_done
+   378 BB78			not_right
+   379 BB78 C9 02			cmp #2
+   380 BB7A D0 0E			bne not_down
+   381 					; scroll down
+   382 BB7C E6 D3			inc scroll_y
+   383 BB7E A5 D3			lda scroll_y
+   384 BB80 C9 60			cmp #96
+   385 BB82 D0 04			bne @+
+   386 BB84 A9 03			lda #3
+   387 BB86 85 D0			sta scroll_dir
+   388 BB88 D0 1A		@	bne scroll_done
+   389 BB8A			not_down
+   390 BB8A C9 03			cmp #3
+   391 BB8C D0 0A			bne not_left
+   392 					; scroll left
+   393 BB8E C6 D2			dec scroll_x
+   394 BB90 D0 04			bne @+
+   395 BB92 A9 04			lda #4
+   396 BB94 85 D0			sta scroll_dir
+   397 BB96 D0 0C		@	bne scroll_done
+   398 BB98			not_left
+   399 BB98 C9 04			cmp #4
+   400 BB9A D0 08			bne scroll_done
+   401 					; scroll up
+   402 BB9C C6 D3			dec scroll_y
+   403 BB9E D0 04			bne scroll_done
+   404 BBA0 A9 01			lda #1
+   405 BBA2 85 D0			sta scroll_dir
+   406 BBA4			scroll_done
+   407 BBA4 A5 D2 8D 43 9F		mva scroll_x SCROLLX
+   408 BBA9 A5 D3 8D 42 9F		mva scroll_y SCROLLY
+   409 BBAE 60				rts
+   410
+   411 BBAF			VBI
+   412 BBAF A9 0E 8D 1A D0		mva #$0E COLBAK ; white
+   413 BBB4 20 55 08			jsr .ADR do_scroll
+   414 BBB7 A9 30 8D DF D5		mva #CART_CMD_REFRESH_SCREEN $D5DF
+   415 BBBC				wait_cart_ready
+Macro: WAIT_CART_READY [Source: GameBoyPY.asm]
+     1 BBBC A9 58			lda #'X'
+     2 BBBE			@
+     3 BBBE CD DE D5			cmp $D5DE
+     5 BBC1 D0 FB			bne @-
+Source: GameBoyPY.asm
+   416 BBC3 AD 40 D5 8D 04 D4		mva $D540 HSCROL
+   417 BBC9 AD C8 02 8D 1A D0		mva COLOR4 COLBAK
+   418 BBCF 4C 62 E4			JMP XITVBV
+   419
+   420 					.endp
+   421
+   422 BBD2 FF FF FF FF FF FF + 	.align $bc00,$FF
+   423 BC00				org $bc00, $600
+   424
+   425 BC00			page_6_data_start
+   426 BC00			flower_images
+   427 BC00 81 00 00 18 00 24 + 	.byte $81, $00, $00, $18, $00, $24, $85, $5A, $1C, $42, $18, $A5, $00, $7E, $81, $18 ; down
+   428 BC10 81 00 00 18 00 24 + 	.byte $81, $00, $00, $18, $00, $24, $85, $5A, $1C, $42, $18, $A5, $00, $7E, $81, $18 ; down
+   429 BC20 81 00 00 0C 00 12 + 	.byte $81, $00, $00, $0C, $00, $12, $82, $2D, $0E, $E1, $0C, $73, $00, $3E, $81, $18 ; right
+   430 BC30 81 18 00 24 04 5A + 	.byte $81, $18, $00, $24, $04, $5a, $9d, $42, $18, $24, $00, $DB, $00, $7E, $81, $18 ; up
+   431
+   432 BC40			example_oam
+   433 BC40 28 19 00 00			.byte $28, $19, $00, $00
+   434 BC44 28 21 01 00			.byte $28, $21, $01, $00
+   435 BC48 30 19 02 00			.byte $30, $19, $02, $00
+   436 BC4C 30 21 03 00			.byte $30, $21, $03, $00
+   437 BC50 4C 3A 34 00			.byte $4C, $3A, $34, $00
+   438 BC54 4C 42 35 00			.byte $4C, $42, $35, $00
+   439 BC58 54 3A 36 00			.byte $54, $3A, $36, $00
+   440 BC5C 54 42 37 00			.byte $54, $42, $37, $00
+   441 BC60 6C 53 44 20			.byte $6C, $53, $44, $20
+   442 BC64 6C 4B 45 20			.byte $6C, $4B, $45, $20
+   443 BC68 74 53 46 20			.byte $74, $53, $46, $20
+   444 BC6C 74 4B 47 20			.byte $74, $4B, $47, $20
+   445
+   446 BC70			example_regs
+   447 BC70 E3				.byte $E3
+   448 BC71 89				.byte $89
+   449 BC72 60				.byte $60 ; X = 96
+   450 BC73 60				.byte $60 ; Y = 96
+   451 BC74 90				.byte $90
+   452 BC75 00				.byte $00
+   453 BC76 C3				.byte $C3
+   454 BC77 E4				.byte $E4 ; 11 10 01 00 - 3 2 1 0
+   455 BC78 D0				.byte $D0 ; 11 01 00 00 - 3 1 0 0
+   456 BC79 E0				.byte $E0 ; 11 10 00 00 - 3 2 0 0
+   457 BC7A 90				.byte $90
+   458 BC7B 07				.byte $07
+   459 BC7C			page_6_data_end
+   460
+   461 BC7C FF FF FF FF FF FF + 	.align $bd00,$FF
+   462 BD00				org $bd00,$7c00 ;Dlist
+   463 BD00			G15_dlist
+   464 BD00 70 70 70		:3	.byte $70
+   465 BD03 5E				.byte $5E
+   466 BD04 10 A0			.word $A010
+   467 BD06 1E 1E 1E 1E 1E 1E + :84	.byte $1E
+   468 BD5A 5E				.byte $5E
+   469 BD5B 00 B0			.word $B000
+   470 BD5D 1E 1E 1E 1E 1E 1E + :74	.byte $1E
+   471 BDA7 41				.byte $41
+   472 BDA8 00 7C			.word .ADR G15_dlist
+   473
+   474 BDAA F8 F8 F8 F8 F8 F8 + 	.align $be00,$F8
+   475 BE00				org $be00,$7d80 ;Dlist
+   476 BE00			.proc display_list
+   477 BE00 70 70 70		:3	.byte $70
+   478 BE03 5E 00 D5 5E 00 D5 + :160	.byte $5E, $00, $D5
+   479 BFE3 41				.byte $41
+   480 BFE4 80 7D			.word .ADR display_list
+   481 					.endp
+   482 					
+   483 				; ************************ CARTRIDGE CONTROL BLOCK *****************
+   484
+   485 BFE6 FF FF FF FF FF FF + 	.align $bff8,$FF
+   486 BFF8				org $bff8                 ;Cartridge control block
+   487 BFF8 47 42			.byte 'G', 'B'			  ;Signal to the UNO Cart for VRAM support
+   488 BFFA 00 B0			.word start               ;CARTCS
+   489 BFFC 00				.byte 0                   ;CART
+   490 BFFD 04				.byte CARTFG_START_CART   ;CARTFG
+   491 BFFE F7 AF			.word init                ;CARTAD
