@@ -283,7 +283,7 @@ anim_loop
 @	stx $231
 	sta $230
 	; delay
-	lda #20
+	lda #15
 	jsr .ADR wait_n_vbi
 	; flower
 	tya
@@ -353,7 +353,7 @@ init_scroll
 	mva #1 scroll_delay
 	mva #3 scroll_dir
 	mva #96 scroll_x
-	mva #96 scroll_y
+	mva #96*2 scroll_y
 	rts
 
 	; scroller
@@ -381,7 +381,7 @@ not_right
 	; scroll down
 	inc scroll_y
 	lda scroll_y
-	cmp #96
+	cmp #96*2
 	bne @+
 	lda #3
 	sta scroll_dir
@@ -404,8 +404,11 @@ not_left
 	lda #1
 	sta scroll_dir
 scroll_done
-	mva scroll_x SCROLLX
-	mva scroll_y SCROLLY
+	lda scroll_x
+	sta SCROLLX
+	lda scroll_y 
+	lsr 
+	sta SCROLLY
 	rts
 
 VBI
@@ -484,7 +487,7 @@ G15_dlist
 
 	.align $bff8,$FF
 	org $bff8                 ;Cartridge control block
-	.byte 'G', 'B'			  ;Signal to the UNO Cart for VRAM support
+	.byte 'G', 'B'		  ;Signal to the UNO Cart for VRAM support
 	.word start               ;CARTCS
 	.byte 0                   ;CART
 	.byte CARTFG_START_CART   ;CARTFG

@@ -26,6 +26,7 @@
 #include "cart_emu.h"
 #include "xex_ldr.h"
 #include "GameBoy.h"
+#include "Mode7.h"
 #include "sdcard.h"
 
 int num_dir_entries = 0; // how many entries in the current directory
@@ -356,7 +357,12 @@ int load_file(char *filename) {
 			{
 				cart_type = CART_TYPE_GB;
 			}
+			else if (cart_ram1[0x1FF8]=='M' && cart_ram1[0x1FF9]=='7')
+			{
+				cart_type = CART_TYPE_M7;
+			}
 			else
+
 			{
 				cart_type = CART_TYPE_8K;
 			}

@@ -27,6 +27,7 @@
 #include "cart_emu.h"
 #include "BootStrap.h"
 #include "GameBoy.h"
+#include "Mode7.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -74,6 +75,8 @@ int main(void) {
 		feed_XEX_loader();
 	} else if (cartType == CART_TYPE_GB) {
 		emulate_GameBoy_vram();
+	} else if (cartType == CART_TYPE_M7) {
+		emulate_Mode7_vram();
 	} else {
 		emulate_cartridge();
 	}
