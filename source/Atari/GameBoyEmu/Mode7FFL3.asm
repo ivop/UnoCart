@@ -1,7 +1,7 @@
 /* Mode-7 Demo ROM for use with UnoCart
  * by Mark Keates/Wrathchild@AtariAge
  * This file builds with WUDSN/MADS into an 8K Atari ROM
- * The 8k ROM is loaded with the Final Fantasy/VRAM from Pokemon:
+ * The 8k ROM is loaded with the Final Fantasy Legend III/VRAM:
  */
 
 CART_CMD_REFRESH_M7_SCREEN = $30
@@ -273,15 +273,15 @@ Hex2Screen
 	.align $bd00,$FF
 	org $bd00,$600 ;Dlist
 .proc G15_dlist
-:3	.byte $70
+:2	.byte $70
 	.byte $42
 	.word $6D8
 	.byte $4E
 	.word $A010
-:84	.byte $1E
+:101	.byte $1E
 	.byte $4E
 	.word $B000
-:74	.byte $1E
+:97	.byte $1E
 	.byte $41
 	.word .ADR G15_dlist
 .endp

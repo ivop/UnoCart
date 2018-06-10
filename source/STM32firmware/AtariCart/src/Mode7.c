@@ -3,8 +3,6 @@
 #include "vram_m7.h"
 #include "Mode7.h"
 
-#define CHARS_PER_ROW 48
-
 void emulate_mode7(void) {
 	uint16_t addr, data, c;
 	__disable_irq();	// Disable interrupts
