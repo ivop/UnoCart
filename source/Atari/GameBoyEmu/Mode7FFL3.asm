@@ -6,7 +6,8 @@
 
 CART_CMD_REFRESH_M7_SCREEN = $30
 CART_CMD_INIT_M7_VRAM = $31
-CART_CMD_PROCESS_MOVEMENT = $32
+CART_CMD_PREPARE_M7_SCREEN = $32
+CART_CMD_PROCESS_M7_MOVEMENT = $33
 
 ;@com.wudsn.ide.asm.outputfileextension=.rom
 
@@ -120,7 +121,7 @@ start   .proc
 	tay
 	lda .ADR Hex2Screen,y
 	sta $6FE
-@	lda $D5DE
+	lda $D5DE
 	and #$f
 	tay
 	lda .ADR Hex2Screen,y
@@ -153,11 +154,11 @@ start   .proc
 
 	wait_cart_ready
 	
-	mva #$1A COLOR0
-	mva #$16 COLOR1
-	mva #$12 COLOR2
-	sta COLOR4
+	mva #$FA COLOR0
+	mva #$FE COLOR1
+	mva #$F0 COLOR2
 	mva #$00 COLOR3 ; unused
+	sta COLOR4
 
 	jsr .ADR wait_for_vbi
 	lda SDMCTL
@@ -172,12 +173,7 @@ start   .proc
 	show_msg MsgInit
 	wait_cart_ready
 	
-	; draw the initial screen
-	mva #CART_CMD_REFRESH_M7_SCREEN $D5DF
-	show_msg MsgRefresh
-	wait_cart_ready
-	
-	lda #$1E
+	lda #$F4
 	jsr .ADR set_bg_colour
 	
 	lda $BFFD
@@ -201,19 +197,21 @@ CartOK
 @	sta $9C00,y
 	dey
 	bpl @-
+	sty .ADR frame
 	
 	; Restore DMA (screen turns on at next VBlank)
 	pla
 	sta SDMCTL
-	; enable dli's
-	mva #$C0 NMIEN
+	; enable vbi's
+	mva #$40 NMIEN
 	
 endless
-	ldy #0
-anim_loop
-	; delay
-	lda #15
-	jsr .ADR wait_n_vbi
+	lda #0
+	sta .ADR lock_vbi
+	jsr .ADR wait_for_vbi
+	wait_cart_ready
+;	lda .ADR frame
+;	jsr .ADR set_bg_colour
 	jmp .ADR endless
 
 wait_for_vbi
@@ -231,17 +229,14 @@ set_bg_colour
 	sta COLBAK
 	rts
 
-clear_text
+show_text
+	sty .ADR st + 1
+	stx .ADR st + 2
 	ldy #$27
 	lda #0
 @	sta $6D8,y
 	dey
 	bpl @-
-	rts
-
-show_text
-	sty .ADR st + 1
-	stx .ADR st + 2
 	ldy #0
 st:	lda $ffff,y
 	bmi @+
@@ -251,10 +246,24 @@ st:	lda $ffff,y
 @	rts
 
 VBI
-	mva #$0E COLBAK ; white
-	mva #CART_CMD_REFRESH_M7_SCREEN $D5DF
-	wait_cart_ready
-	mva COLOR4 COLBAK
+	lda .ADR lock_vbi
+	beq @+
+	JMP XITVBV
+@	inc .ADR lock_vbi
+;	mva #$0E COLBAK ; white
+	inc .ADR frame
+	lda .ADR frame
+	and #1
+	ora #$10
+	sta $6fa
+	and #1
+	bne @+
+	lda #CART_CMD_PREPARE_M7_SCREEN
+	bne @+1
+@	lda #CART_CMD_REFRESH_M7_SCREEN
+@	sta $D5DF
+	eor #$20
+	sta $6fc
 	JMP XITVBV
 
 MsgWaitCart
@@ -264,9 +273,12 @@ MsgInit
 MsgRefresh
 	dta d'First VRAM Refresh',$80
 MsgOk
-	dta d'OK',$80
+	dta d'UNO-Cart : Mode-7 Demo',$80
 Hex2Screen
 	dta d'0123456789ABCDEF'
+
+frame	.byte 0
+lock_vbi	.byte 0
 
 	.endp
 
@@ -278,10 +290,10 @@ Hex2Screen
 	.word $6D8
 	.byte $4E
 	.word $A010
-:101	.byte $1E
+:101	.byte $E
 	.byte $4E
 	.word $B000
-:97	.byte $1E
+:97	.byte $E
 	.byte $41
 	.word .ADR G15_dlist
 .endp
@@ -290,7 +302,7 @@ Hex2Screen
 
 	.align $bff8,$FF
 	org $bff8                 ;Cartridge control block
-	.byte 'M', '7'		  ;Signal to the UNO Cart for MODE-7 VRAM support
+	.byte 'M', '7'            ;Signal to the UNO Cart for MODE-7 VRAM support
 	.word start               ;CARTCS
 	.byte 0                   ;CART
 	.byte CARTFG_START_CART   ;CARTFG

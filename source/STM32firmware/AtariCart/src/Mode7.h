@@ -6,7 +6,8 @@
 
 #define CART_CMD_REFRESH_M7_SCREEN		0x30
 #define CART_CMD_LOAD_M7_VRAM			0x31
-#define CART_CMD_PROCESS_MOVEMENT		0x32
+#define CART_CMD_PREPARE_M7_SCREEN		0x32
+#define CART_CMD_PROCESS_M7_MOVEMENT	0x33
 
 extern void emulate_Mode7_vram(void);
 
