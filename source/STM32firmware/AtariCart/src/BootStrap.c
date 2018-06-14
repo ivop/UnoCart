@@ -43,7 +43,7 @@ void emulate_boot_rom(void) {
 			// normal cartridge read
 			SET_DATA_MODE_OUT
 			addr = ADDR_IN;
-			DATA_OUT = ((uint16_t)(UnoCart_rom[addr])) << 8;
+			DATA_OUT = ((uint16_t)(UnoCart_ROM[addr])) << 8;
 			// wait for phi2 low
 			while (CONTROL_IN & PHI2)
 				;
